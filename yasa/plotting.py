@@ -255,7 +255,7 @@ def plot_spectrogram(
     # Safety checks
     assert isinstance(data, np.ndarray), "`data` must be a 1D NumPy array."
     assert isinstance(sf, (int, float)), "`sf` must be int or float."
-    assert data.ndim == 1, "`data` must be a 1D (single-channel) NumPy array."
+    # assert data.ndim == 1, "`data` must be a 1D (single-channel) NumPy array."
     assert isinstance(win_sec, (int, float)), "`win_sec` must be int or float."
     assert isinstance(fmin, (int, float)), "`fmin` must be int or float."
     assert isinstance(fmax, (int, float)), "`fmax` must be int or float."
@@ -268,19 +268,35 @@ def plot_spectrogram(
     if vmax is not None:
         assert isinstance(vmin, (int, float)), "`vmin` must be int or float if `vmax` is provided."
     if hypno is not None:
-        assert hypno.size == data.size, "`hypno` must have the same number of samples as `data`."
+        assert hypno.size == data.shape[1], "`hypno` must have the same number of samples as `data`."
 
     # Calculate multi-taper spectrogram
     nperseg = int(win_sec * sf)
     assert data.size > 2 * nperseg, "`data` length must be at least 2 * `win_sec`."
-    f, t, Sxx = spectrogram_lspopt(data, sf, nperseg=nperseg, noverlap=0)
-    Sxx = 10 * np.log10(Sxx)  # Convert uV^2 / Hz --> dB / Hz
 
-    # Select only relevant frequencies (up to 30 Hz)
-    good_freqs = np.logical_and(f >= fmin, f <= fmax)
-    Sxx = Sxx[good_freqs, :]
-    f = f[good_freqs]
-    t /= 3600  # Convert t to hours
+    Sxx_list = []
+    f_list = []
+    t_list = []
+
+    n_channels = data.shape[0]
+    for i in range(n_channels):
+        f, t, Sxx = spectrogram_lspopt(data[i], sf, nperseg=nperseg, noverlap=0)
+        Sxx = 10 * np.log10(Sxx)  # Convert uV^2 / Hz --> dB / Hz
+
+        # Select only relevant frequencies (up to 30 Hz)
+        good_freqs = np.logical_and(f >= fmin, f <= fmax)
+        Sxx = Sxx[good_freqs, :]
+        f = f[good_freqs]
+        t /= 3600  # Convert t to hours
+
+        Sxx_list.append(Sxx)
+        f_list.append(f)
+        t_list.append(t)
+
+    # assert f_list[0] == f_list[1]
+    # assert t_list[0] == t_list[1]
+    f = f_list[0]
+    t = t_list[0]
 
     # Normalization
     if vmin is None:
@@ -289,19 +305,22 @@ def plot_spectrogram(
 
     # Open figure
     if hypno is None:
-        fig, ax1 = plt.subplots(nrows=1, figsize=(12, 4))
+        fig, ax = plt.subplots(nrows=n_channels, figsize=(12, 4+2*(n_channels-1)))
     else:
-        fig, (ax0, ax1) = plt.subplots(
-            nrows=2,
-            figsize=(12, 6),
-            gridspec_kw={"height_ratios": [1, 2], "hspace": 0.1},
+        fig, (ax0, *ax) = plt.subplots(
+            nrows=n_channels+1,
+            figsize=(12, 6+2*(n_channels-1)),
+            # gridspec_kw={"height_ratios": [1, 2], "hspace": 0.1},
         )
 
     # Draw Spectrogram
-    im = ax1.pcolormesh(t, f, Sxx, norm=norm, cmap=cmap, antialiased=True, shading="auto")
-    ax1.set_xlim(0, t.max())
-    ax1.set_ylabel("Frequency [Hz]")
-    ax1.set_xlabel("Time [hrs]")
+    ims = []
+    for i in range(n_channels):
+        im = ax[i].pcolormesh(t, f, Sxx_list[i], norm=norm, cmap=cmap, antialiased=True, shading="auto")
+        ax[i].set_xlim(0, t.max())
+        ax[i].set_ylabel("Frequency [Hz]")
+        ax[i].set_xlabel("Time [hrs]")
+        ims.append(im)
 
     if hypno is not None:
         # Convert sampling frequency to pandas timefrequency string (e.g., "30s")
@@ -315,11 +334,14 @@ def plot_spectrogram(
         ax0.xaxis.set_visible(False)
     else:
         # Add colorbar
-        cbar = fig.colorbar(im, ax=ax1, shrink=0.95, fraction=0.1, aspect=25)
-        cbar.ax.set_ylabel("Log Power (dB / Hz)", rotation=270, labelpad=20)
+        for i in range(n_channels):
+            cbar = fig.colorbar(ims[i], ax=ax[i], shrink=0.95, fraction=0.1, aspect=25)
+            cbar.ax[i].set_ylabel("Log Power (dB / Hz)", rotation=270, labelpad=20)
 
+    plt.tight_layout()
     # Revert font-size
     plt.rcParams.update({"font.size": old_fontsize})
+    plt.show()
     return fig
 
 
