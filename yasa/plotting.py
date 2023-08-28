@@ -71,8 +71,8 @@ def plot_hypnogram(hyp, lw=1.5, highlight="REM", fill_color=None, ax=None):
     hyp = hyp.copy()
 
     # Increase font size while preserving original
-    old_fontsize = plt.rcParams["font.size"]
-    plt.rcParams.update({"font.size": 18})
+    # old_fontsize = plt.rcParams["font.size"]
+    # plt.rcParams.update({"font.size": 18})
 
     ## Remap stages to be in desired y-axis order ##
     # Start with default of all allowed labels
@@ -137,7 +137,7 @@ def plot_hypnogram(hyp, lw=1.5, highlight="REM", fill_color=None, ax=None):
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
         ax.xaxis.set_major_locator(mdates.AutoDateLocator())
     # Revert font-size
-    plt.rcParams.update({"font.size": old_fontsize})
+    # plt.rcParams.update({"font.size": old_fontsize})
     return ax
 
 
@@ -249,8 +249,8 @@ def plot_spectrogram(
     from yasa.hypno import Hypnogram, hypno_int_to_str  # Avoiding circular imports
 
     # Increase font size while preserving original
-    old_fontsize = plt.rcParams["font.size"]
-    plt.rcParams.update({"font.size": 18})
+    # old_fontsize = plt.rcParams["font.size"]
+    # plt.rcParams.update({"font.size": 18})
 
     # Safety checks
     assert isinstance(data, np.ndarray), "`data` must be a 1D NumPy array."
@@ -319,7 +319,12 @@ def plot_spectrogram(
         im = ax[i].pcolormesh(t, f, Sxx_list[i], norm=norm, cmap=cmap, antialiased=True, shading="auto")
         ax[i].set_xlim(0, t.max())
         ax[i].set_ylabel("Frequency [Hz]")
-        ax[i].set_xlabel("Time [hrs]")
+
+        # turn off x ticks and label if not last plot
+        if i == n_channels-1:
+            ax[i].set_xlabel("Time [hrs]")
+        if i != n_channels-1:
+            ax[i].set_xticks([])
         ims.append(im)
 
     if hypno is not None:
@@ -338,9 +343,10 @@ def plot_spectrogram(
             cbar = fig.colorbar(ims[i], ax=ax[i], shrink=0.95, fraction=0.1, aspect=25)
             cbar.ax[i].set_ylabel("Log Power (dB / Hz)", rotation=270, labelpad=20)
 
+
     plt.tight_layout()
     # Revert font-size
-    plt.rcParams.update({"font.size": old_fontsize})
+    # plt.rcParams.update({"font.size": old_fontsize})
     plt.show()
     return fig
 
